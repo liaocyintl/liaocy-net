@@ -9,7 +9,7 @@ const config = {
   title: 'Jackie Liao',
   tagline: 'My Homepage',
   url: 'https://liaocy.net',
-  baseUrl: '/',
+  baseUrl: '/liaocy-net/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   onDuplicateRoutes: 'warn',
