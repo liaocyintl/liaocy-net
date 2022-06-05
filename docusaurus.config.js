@@ -17,9 +17,9 @@ const config = {
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'liaocy.net', // Usually your GitHub org/user name.
+  organizationName: 'liaocy', // Usually your GitHub org/user name.
   projectName: 'liaocy.net', // Usually your repo name.
-
+  deploymentBranch: 'gh-pages',
   githubHost: 'github.com',
   trailingSlash: false,
   // Even if you don't use internalization, you can use this field to set useful
