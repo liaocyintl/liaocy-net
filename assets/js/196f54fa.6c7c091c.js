@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkliaocy_net=self.webpackChunkliaocy_net||[]).push([[702],{4745:function(e){e.exports=JSON.parse('{"label":"kubernetes","permalink":"/liaocy-net/blog/tags/kubernetes","allTagsPath":"/liaocy-net/blog/tags","count":1}')}}]);

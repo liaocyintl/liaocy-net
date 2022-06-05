@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkliaocy_net=self.webpackChunkliaocy_net||[]).push([[622],{9946:function(t){t.exports=JSON.parse('{"permalink":"/liaocy-net/blog/tags/k-8-s-tutorial","page":1,"postsPerPage":10,"totalPages":1,"totalCount":1,"blogDescription":"Blog","blogTitle":"Blog"}')}}]);
