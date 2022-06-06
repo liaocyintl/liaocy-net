@@ -10,9 +10,9 @@ const config = {
   tagline: 'A Full-stack Developer, Ph.D in Computer Science',
   url: 'https://liaocy.net',
   baseUrl: '/liaocy-net/',
-  onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
-  onDuplicateRoutes: 'warn',
+  onBrokenLinks: 'ignore',
+  onBrokenMarkdownLinks: 'ignore',
+  onDuplicateRoutes: 'ignore',
   favicon: 'img/favicon.ico',
 
   // GitHub pages deployment config.
@@ -61,7 +61,8 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       prism: {
-        additionalLanguages: ['bash'],
+        theme: require('prism-react-renderer/themes/dracula'),
+        additionalLanguages: ['bash', 'yaml', 'json'],
       },
       navbar: {
         title: 'My Site',

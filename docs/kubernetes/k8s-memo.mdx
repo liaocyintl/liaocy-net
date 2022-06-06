@@ -1,13 +1,14 @@
 ---
 title: K8S Memo
 authors: liaocy
-tags: 
-- Kubernetes
-- k8s
-- k8s-tutorial
+tags:
+  - Kubernetes
+  - k8s
+  - k8s-tutorial
 ---
 
-import { Mermaid } from 'mdx-mermaid/Mermaid'
+import { Mermaid } from "mdx-mermaid/Mermaid";
+import CodeBlock from '@theme/CodeBlock';
 
 This is a note of the Kubernetes tutorial.
 
@@ -20,7 +21,8 @@ This is a note of the Kubernetes tutorial.
 
 ### Single Master Node
 
-<Mermaid chart={`
+<Mermaid
+  chart={`
 graph LR
   master[Master 192.168.8.21]
   node1[Node1 192.168.8.31]
@@ -29,77 +31,81 @@ graph LR
   master --> node1
   master --> node2
   master --> node3
-`} />
+`}
+/>
 
 ### High-Availability Master Nodes
 
 ## Build K8S Cluster via Kubeadm
 
-### OS
+### OS image
+
 [CentOS-7-x86_64-Minimal-2009.iso](https://ftp.riken.jp/Linux/centos/7.9.2009/isos/x86_64/)
 
-### Install Tools (ALL Nodes)
+### Min Spec 
+- Lab environment
+  - CPU: 2 cores
+  - Memory: 2GB
+  - Disk: 100GB
 
-```bash On
+### Install Tools
+
+```bash title="run on all nodes"
 # Install tools
 yum install -y wget
 yum install -y nano
 yum install net-tools
 ```
 
-### Close Firewall (ALL Nodes)
+### Close Firewall
 
-```bash
+```bash title="run on all nodes"
 systemctl stop firewalld
 systemctl disable firewalld
 ```
 
-### Close swap (ALL Nodes)
+### Close swap
 
-```bash
+```bash title="run on all nodes"
 swapoff -a
 sed -ri 's/.*swap.*/#&/' /etc/fstab
 ```
 
-### Set hostnames (ALL Nodes Individually)
-
-On master:
-```bash
+### Set hostnames
+```bash title="run on master"
 hostnamectl set-hostname kube-master
 ```
 
-On node1:
-```bash
+```bash title="run on node1"
 hostnamectl set-hostname kube-node1
 ```
 
-On node2:
-```bash
+```bash title="run on node2"
 hostnamectl set-hostname kube-node2
 ```
 
-On node3:
-```bash
+```bash title="run on node3"
 hostnamectl set-hostname kube-node3
 ```
 
-### Set hosts (Master Node)
+### Set hosts
 
-```bash
+```bash title="run on master"
 nano /etc/hosts
 ```
 
 Fill in the following contents:
-```text
+
+```text title="/etc/hosts"
 192.168.8.21 kube-master
 192.168.8.31 kube-node1
 192.168.8.32 kube-node2
 192.168.8.33 kube-node3
 ```
 
-### Write Kube Traffic in iptables (All Nodes)
+### Write Kube Traffic in iptables
 
-```bash
+```bash title="run on all nodes"
 cat <<EOF > /etc/sysctl.d/k8s.conf
 net.bridge.bridge-nf-call-ip6tables = 1
 net.bridge.bridge-nf-call-iptables = 1
@@ -108,9 +114,9 @@ EOF
 sysctl --system
 ```
 
-### Install Docker (All Nodes)
+### Install Docker
 
-```bash
+```bash title="run on all nodes"
 yum install -y yum-utils
 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
 yum install -y docker-ce-18.06.1.ce-3.el7 docker-ce-cli-18.06.1.ce-3.el7 containerd.io docker-compose-plugin
@@ -118,9 +124,9 @@ systemctl enable docker && systemctl start docker
 docker --version
 ```
 
-### Install Kubelet (All Nodes)
+### Install Kubelet
 
-```bash
+```bash title="run on all nodes"
 cat <<EOF > /etc/yum.repos.d/kubernetes.repo
 [kubernetes]
 name=Kubernetes
@@ -139,9 +145,9 @@ systemctl enable kubelet
 
 ```
 
-### Init Kube Master Node (Master Only)
+### Init Kube Master Node
 
-```bash
+```bash title="run on master"
 kubeadm init --apiserver-advertise-address=192.168.8.21 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
 
 mkdir -p $HOME/.kube
@@ -151,39 +157,51 @@ kubectl get nodes
 ```
 
 The token is only valid for 24-hours. You can use the following command to generate a new token.
+
 ```bash
 kubeadm token create --print-join-command
 ```
 
-### Install flannel plugin (Master Only)
+### Install flannel plugin
 
-```bash
-wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
-nano kube-flannel.yml
-```
+import KubeFlannelYMAL from '!!raw-loader!./assets/kube-flannel.yml';
 
-Modify `kube-flannel.yml` as following: [ref.](https://none06.hatenadiary.org/entry/2022/05/28/025115)
+<details>
+  <summary>Save as `kube-flannel.yml`</summary>
+  <CodeBlock language="yaml">{KubeFlannelYMAL}</CodeBlock>
+</details>
 
-![alt](imgs/k8s-memo/2022-06-06-11-01-22.png "title")
-
-```bash
+```bash title="run on master"
 $ kubectl apply -f kube-flannel.yml
 $ kubectl get pods -n kube-system
 $ kubectl get nodes
 ```
 
-### Install Slave Nodes (All Slave Nodes)
+:::warning Installing flannel plugin may cause some problems.
+
+Referencing https://none06.hatenadiary.org/entry/2022/05/28/025115
+
+```bash title="Official Kube Flannel Yaml"
+wget https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+nano kube-flannel.yml
+```
+
+![alt](imgs/k8s-memo/2022-06-06-11-01-22.png "title")
+
+:::
+
+### Install Slave Nodes
 
 This command should be copied from the contents that the master node generated.
 
-```bash
+```bash title="run on slave nodes"
  kubeadm join 192.168.8.21:6443 --token fxm6sy.jsw1uyarkx2fzsnw \
     --discovery-token-ca-cert-hash sha256:77c6f969d3e43942e4dea3b3c413ac9178fe89a2a6ac1a98254593eba574719e
 ```
 
-### Startup Test Nginx Pod (Master Only)
+### Startup Test Nginx Pod
 
-```bash
+```bash title="run on master"
 kubectl create deployment nginx --image=nginx
 kubectl get pods
 kubectl expose deployment nginx --port=80 --type=NodePort
@@ -198,3 +216,92 @@ http://<node_ip>:<exposed_port>/
 ## Build K8S Cluster via Binary
 
 pending
+
+## Ingress Controller
+
+Ingress Controller is a Kubernetes add-on that provides a simple way to expose your services to the internet.
+
+### Create Text Pods
+
+```bash
+kubectl create deployment web --image=nginx
+kubectl get pods -o wide
+
+# NAME                   READY   STATUS              RESTARTS   AGE   IP       NODE         NOMINATED NODE   READINESS GATES
+# web-5dcb957ccc-px72n   0/1     ContainerCreating   0          7s    <none>   kube-node1   <none>           <none>
+
+```
+
+### Expose Port
+
+```bash
+
+kubectl expose deployment web --port=80 --target-port=80 --type=NodePort
+
+kubectl get svc
+
+# NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+# kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP        3d14h
+# web          NodePort    10.109.213.80   <none>        80:30622/TCP   70s
+
+```
+
+### Create Ingress Controller
+
+import IngressControllerYAML from '!!raw-loader!./assets/ingress-controller.yml';
+
+<details>
+  <summary>Save as `ingress-controller.yml`</summary>
+  <CodeBlock language="yaml">{IngressControllerYAML}</CodeBlock>
+</details>
+
+```bash title="run on master"
+kubectl apply -f ingress-controller.yml 
+
+# namespace/ingress-nginx created
+# configmap/nginx-configuration created
+# configmap/tcp-services created
+# configmap/udp-services created
+# serviceaccount/nginx-ingress-serviceaccount created
+# clusterrole.rbac.authorization.k8s.io/nginx-ingress-clusterrole created
+# role.rbac.authorization.k8s.io/nginx-ingress-role created
+# rolebinding.rbac.authorization.k8s.io/nginx-ingress-role-nisa-binding created
+# clusterrolebinding.rbac.authorization.k8s.io/nginx-ingress-clusterrole-nisa-binding created
+# daemonset.apps/nginx-ingress-controller created
+# service/ingress-nginx created
+
+```
+
+### Apply Ingress Controller
+
+```bash
+kubectl get pods -n ingress-nginx
+
+# NAME                             READY   STATUS              RESTARTS   AGE
+# nginx-ingress-controller-57wqf   0/1     ContainerCreating   0          111s
+# nginx-ingress-controller-5spw2   0/1     Running             0          111s
+# nginx-ingress-controller-kk552   0/1     ContainerCreating   0          111s
+```
+
+import IngressYAML from '!!raw-loader!./assets/ingress.yml';
+
+<details>
+  <summary>Save as `ingress.yml`</summary>
+  <CodeBlock language="yaml">{IngressYAML}</CodeBlock>
+</details>
+
+```bash
+kubectl apply -f ingress.yaml 
+# ingress.networking.k8s.io/example-ingress created
+
+kubectl get ing
+# NAME              CLASS    HOSTS                   ADDRESS   PORTS   AGE
+# example-ingress   <none>   example.ingredemo.com             80      5m52s
+```
+
+Then you can access the service with the `example.ingredemo.com`.
+
+
+:::warning
+`example.ingredemo.com` should be specified as the IP of any slave node.
+:::
