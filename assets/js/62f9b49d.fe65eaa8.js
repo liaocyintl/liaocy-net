@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkliaocy_net=self.webpackChunkliaocy_net||[]).push([[121],{8345:function(a){a.exports=JSON.parse('{"label":"k8s","permalink":"/liaocy-net/blog/tags/k-8-s","allTagsPath":"/liaocy-net/blog/tags","count":1}')}}]);
