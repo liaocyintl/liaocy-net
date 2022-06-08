@@ -7,7 +7,6 @@ tags:
   - k8s-tutorial
 ---
 
-import { Mermaid } from "mdx-mermaid/Mermaid";
 import CodeBlock from '@theme/CodeBlock';
 
 This is a note of the Kubernetes tutorial.
@@ -21,8 +20,7 @@ This is a note of the Kubernetes tutorial.
 
 ### Single Master Node
 
-<Mermaid
-  chart={`
+```mermaid
 graph LR
   master[Master 192.168.8.21]
   node1[Node1 192.168.8.31]
@@ -31,8 +29,7 @@ graph LR
   master --> node1
   master --> node2
   master --> node3
-`}
-/>
+```
 
 ### High-Availability Master Nodes
 
@@ -43,7 +40,7 @@ graph LR
 [CentOS-7-x86_64-Minimal-2009.iso](https://ftp.riken.jp/Linux/centos/7.9.2009/isos/x86_64/)
 
 ### Min Spec 
-- Lab environment
+- Lab environment (Master and Slaves)
   - CPU: 2 cores
   - Memory: 2GB
   - Disk: 100GB
@@ -54,7 +51,7 @@ graph LR
 # Install tools
 yum install -y wget
 yum install -y nano
-yum install net-tools
+yum install -y net-tools
 ```
 
 ### Close Firewall
@@ -305,3 +302,186 @@ Then you can access the service with the `example.ingredemo.com`.
 :::warning
 `example.ingredemo.com` should be specified as the IP of any slave node.
 :::
+
+## HELM
+
+### Introduce
+
+- helm: a package manager for Kubernetes
+
+- Chart: a collection of Kubernetes resources
+
+- Release: version controll
+
+### Usage
+
+- Manage YAML
+- Reuse YAML
+- Version Control
+
+### Install Helm
+
+Ref: https://helm.sh/docs/intro/quickstart/
+
+```bash
+wget https://get.helm.sh/helm-v3.9.0-linux-amd64.tar.gz
+tar zxvf helm-v3.9.0-linux-amd64.tar.gz
+cp linux-amd64/helm /usr/bin/
+helm version
+```
+
+### Config Helm Repository
+
+```bash 
+helm repo add stable https://charts.helm.sh/stable
+helm repo add alicloud https://kubernetes.oss-cn-hangzhou.aliyuncs.com/charts
+helm repo list
+```
+
+```bash title="update repo"
+helm repo update
+```
+
+```bash title="remove repo"
+helm repo remove alicloud
+```
+
+### App Deployment
+
+```bash
+helm search repo weave
+# NAME                    CHART VERSION   APP VERSION     DESCRIPTION                                       
+# stable/weave-cloud      0.3.9           1.4.0           DEPRECATED - Weave Cloud is a add-on to Kuberne...
+# stable/weave-scope      1.1.12          1.12.0          DEPRECATED - A Helm chart for the Weave Scope c...
+helm install ui stable/weave-scope
+helm list
+helm status ui
+```
+
+```bash title="Check Service and Expose Port"
+kubectl get svc
+# NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+# ui-weave-scope   ClusterIP   10.97.190.230   <none>        80/TCP         3m31s
+kubectl edit svc ui-weave-scope
+# Change 'type: ClusterIP' into 'type: NodePort'
+kubectl get svc
+NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+# ui-weave-scope   NodePort    10.97.190.230   <none>        80:32320/TCP   5m55s
+```
+
+### Create Chart and Reploy
+
+```bash
+helm create mychart
+# Creating mychart
+ls mychart/
+# charts  Chart.yaml  templates  values.yaml
+cd mychart/
+```
+
+#### charts
+
+#### Chart.yaml
+
+Current chart attributes.
+
+#### templates
+
+```bash
+cd templates/
+rm -rf *
+
+kubectl create deployment web1 --image=nginx --dry-run=client -o yaml > deployment.yaml
+
+kubectl create deployment web1 --image=nginx
+kubectl expose deployment web1 --port=80 --target-port=80 --type=NodePort --dry-run=client -o yaml > service.yaml
+kubectl delete deployment web1
+```
+
+#### values.yaml
+
+Some global variables are used in the templates.
+
+
+#### install chart
+
+```bash
+cd /root/
+helm install web1 mychart/
+# NAME: web1
+# LAST DEPLOYED: Wed Jun  8 06:51:05 2022
+# NAMESPACE: default
+# STATUS: deployed
+# REVISION: 1
+# TEST SUITE: None
+
+kubectl get pods -o wide
+# NAME                                            READY   STATUS    RESTARTS   AGE     IP             NODE          NOMINATED NODE   READINESS GATES
+# web1-7f87dfbd56-pz6wh                           1/1     Running   0          31s     10.244.4.72    kube-node3    <none>           <none>
+
+kubectl get svc
+# NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+# web1             NodePort    10.97.201.222   <none>        80:31459/TCP   76s
+```
+
+#### Upgrade Chart
+```bash
+helm upgrade web1 mychart/
+# Release "web1" has been upgraded. Happy Helming!
+# NAME: web1
+# LAST DEPLOYED: Wed Jun  8 06:54:14 2022
+# NAMESPACE: default
+# STATUS: deployed
+# REVISION: 2
+# TEST SUITE: None
+```
+
+### Templates (Dynamic Parameters)
+
+```bash
+cd /root/mychart/
+```
+
+Change `values.yaml` as following:
+
+import ValuesYAML from '!!raw-loader!./assets/values.yaml';
+
+<details>
+  <summary>Save as `values.yaml`</summary>
+  <CodeBlock language="yaml">{ValuesYAML}</CodeBlock>
+</details>
+
+```bash
+cd mychart/templates/
+
+```
+
+import DeploymentYAML from '!!raw-loader!./assets/deployment.yaml';
+
+<details>
+  <summary>Save as `deployment.yaml`</summary>
+  <CodeBlock language="yaml">{DeploymentYAML}</CodeBlock>
+</details>
+
+```bash
+cd /root
+helm install --dry-run web2 mychart/
+helm install web2 mychart/
+# Release "web2" has been upgraded. Happy Helming!
+# NAME: web2
+# LAST DEPLOYED: Wed Jun  8 07:15:51 2022
+# NAMESPACE: default
+# STATUS: deployed
+# REVISION: 1
+# TEST SUITE: None
+
+kubectl get pods
+# NAME                                            READY   STATUS    RESTARTS   AGE
+# web2-deploy-f89759699-9lkgw                     1/1     Running   0          59s
+
+kubectl get svc
+# NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+# web2-svc         NodePort    10.97.103.186   <none>        80:31374/TCP   44s
+```
+
+
