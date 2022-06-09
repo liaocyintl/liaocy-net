@@ -485,3 +485,58 @@ kubectl get svc
 ```
 
 
+## NFS PV PVC
+
+### NFS
+
+```mermaid
+graph LR
+  master[Master 192.168.8.21]
+  node1[Node1 192.168.8.31]
+  node2[Node2 192.168.8.32]
+  node3[Node2 192.168.8.33]
+  nfs[NSF Server 192.168.8.10]
+  master --> node1
+  master --> node2
+  master --> node3
+  nfs --> node1
+  nfs --> node2
+  nfs --> node3
+```
+
+#### install nfs
+
+```bash title="on NFS Server"
+yum install -y nfs-utils
+mkdir -p /data/nfs
+echo "/data/nfs *(rw,sync,no_root_squash,no_subtree_check)" >> /etc/exports
+systemctl start rpcbind
+systemctl start nfs
+systemctl enable rpcbind
+systemctl enable nfs
+ps -ef | grep nfs
+
+echo "<h1>hello nfs</h1>" > /data/nfs/index.html
+```
+
+```bash title="on node1 and node2 and node3"
+yum install -y nfs-utils
+```
+
+import NFSNginxYAML from '!!raw-loader!./assets/nfs-nginx.yaml';
+
+<details>
+  <summary>Save as `nfs-nginx.yaml` on master</summary>
+  <CodeBlock language="yaml">{NFSNginxYAML}</CodeBlock>
+</details>
+
+```bash title="on master"
+kubectl apply -f nfs-nginx.yaml
+kubectl get pods
+# NAME                                            READY   STATUS              RESTARTS   AGE
+# nfs-dep1-6b58cbd59-f7g4s                        0/1     ContainerCreating   0          53s
+kubectl exec -it nfs-dep1-6b58cbd59-f7g4s -- /bin/bash
+ls /usr/share/nginx/html
+# index.html
+kubectl expose deployment nginx-dep1 --port=80 --target-port=80 --type=NodePort
+```
