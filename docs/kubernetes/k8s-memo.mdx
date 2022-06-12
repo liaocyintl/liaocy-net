@@ -15,6 +15,7 @@ This is a note of the Kubernetes tutorial.
 
 1. [Kubernetes](https://kubernetes.io/)
 1. [Kubernetes tutorial (Chinese)](https://youtu.be/W3V-VgTjDjo)
+1. [Prometheus 监控 k8s集群（集群部署）(Chinese)](https://www.jianshu.com/p/db15f4994de3)
 
 ## Physical Structure
 
@@ -161,7 +162,7 @@ kubeadm token create --print-join-command
 
 ### Install flannel plugin
 
-import KubeFlannelYMAL from '!!raw-loader!./assets/kube-flannel.yml';
+import KubeFlannelYMAL from '!!raw-loader!./assets/kube-flannel.yaml';
 
 <details>
   <summary>Save as `kube-flannel.yml`</summary>
@@ -213,6 +214,51 @@ http://<node_ip>:<exposed_port>/
 ## Build K8S Cluster via Binary
 
 pending
+
+## Kubectl
+
+### Delete Node
+
+```bash title="run on master"
+kubectl get nodes
+# NAME          STATUS   ROLES    AGE   VERSION
+# kube-master   Ready    master   10d   v1.18.0
+# kube-node1    Ready    <none>   10d   v1.18.0
+# kube-node2    Ready    <none>   10d   v1.18.0
+# kube-node3    Ready    <none>   10d   v1.18.0
+
+kubectl delete node kube-node3
+# NAME          STATUS   ROLES    AGE   VERSION
+# kube-master   Ready    master   10d   v1.18.0
+# kube-node1    Ready    <none>   10d   v1.18.0
+# kube-node2    Ready    <none>   10d   v1.18.0
+```
+
+```bash title="run on kube-node3"
+kubeadm reset
+# [reset] WARNING: Changes made to this host by 'kubeadm init' or 'kubeadm join' will be reverted.
+# [reset] Are you sure you want to proceed? [y/N]: y
+# [preflight] Running pre-flight checks
+# W0613 05:24:48.614124   25596 removeetcdmember.go:79] [reset] No kubeadm config, using etcd pod spec to get data directory
+# [reset] No etcd config found. Assuming external etcd
+# [reset] Please, manually reset etcd to prevent further issues
+# [reset] Stopping the kubelet service
+# [reset] Unmounting mounted directories in "/var/lib/kubelet"
+# [reset] Deleting contents of config directories: [/etc/kubernetes/manifests /etc/kubernetes/pki]
+# [reset] Deleting files: [/etc/kubernetes/admin.conf /etc/kubernetes/kubelet.conf /etc/kubernetes/bootstrap-kubelet.conf /etc/kubernetes/controller-manager.conf /etc/kubernetes/scheduler.conf]
+# [reset] Deleting contents of stateful directories: [/var/lib/kubelet /var/lib/dockershim /var/run/kubernetes /var/lib/cni]
+
+# The reset process does not clean CNI configuration. To do so, you must remove /etc/cni/net.d
+
+# The reset process does not reset or clean up iptables rules or IPVS tables.
+# If you wish to reset iptables, you must do so manually by using the "iptables" command.
+
+# If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
+# to reset your system's IPVS tables.
+
+# The reset process does not clean your kubeconfig files and you must remove them manually.
+# Please, check the contents of the $HOME/.kube/config file.
+```
 
 ## Ingress Controller
 
@@ -504,8 +550,6 @@ graph LR
   nfs --> node3
 ```
 
-#### install nfs
-
 ```bash title="on NFS Server"
 yum install -y nfs-utils
 mkdir -p /data/nfs
@@ -539,4 +583,312 @@ kubectl exec -it nfs-dep1-6b58cbd59-f7g4s -- /bin/bash
 ls /usr/share/nginx/html
 # index.html
 kubectl expose deployment nginx-dep1 --port=80 --target-port=80 --type=NodePort
+```
+
+## PV and PVC
+
+- PV: Permanent Volume, A provider volume that abstracts storage resources.
+- PVC: Persistent Volume Claim, A consumer requests a volume.
+
+- Procedure:
+  - Develop app
+  - Defind PVC
+  - Defind PV
+
+### Defind PVC
+
+import PVCYAML from '!!raw-loader!./assets/pvc.yaml';
+
+<details>
+  <summary>Save as `pvc.yaml`</summary>
+  <CodeBlock language="yaml">{PVCYAML}</CodeBlock>
+</details>
+
+```bash title="on master"
+kubectl apply -f pvc.yaml
+```
+
+### Define PV
+
+import PVYAML from '!!raw-loader!./assets/pv.yaml';
+
+<details>
+  <summary>Save as `pv.yaml`</summary>
+  <CodeBlock language="yaml">{PVYAML}</CodeBlock>
+</details>
+
+```bash title="on master"
+kubectl apply -f pv.yaml
+# persistentvolume/my-pv created
+
+kubectl get pv,pvc
+# NAME                     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM            STORAGECLASS   REASON   AGE
+# persistentvolume/my-pv   5Gi        RWX            Retain           Bound    default/my-pvc                           52s
+# NAME                           STATUS   VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+# persistentvolumeclaim/my-pvc   Bound    my-pv    5Gi        RWX                           4m7s
+
+kubectl get pods
+# NAME                          READY   STATUS        RESTARTS   AGE
+# nginx-dep1-58b7bf955f-btpv4   1/1     Running       0          4m50s
+# nginx-dep1-58b7bf955f-t97hw   1/1     Running       0          4m50s
+# nginx-dep1-58b7bf955f-vzj8x   1/1     Running       0          4m50s
+```
+
+### Test
+
+```bash title="on master"
+kubectl exec -it nginx-dep1-58b7bf955f-btpv4 -- /bin/bash
+cat /usr/share/nginx/html/index.html 
+# <h1>hello nfs</h1>
+```
+
+## Monitoring
+
+### Monitoring Index
+
+- Cluster Monitoring
+  - Node Resouce Utillzation
+  - Node Number
+  - Node Pods
+- Pods Monitoring
+  - Containers 
+  - Applications
+
+### Prometheus
+
+- An open-source monitoring system.
+- Monitoring, Alerting, and DataStorage.
+- Using HTTP to extract K8S components status periodically.
+
+
+import RBACSetupYAML from '!!raw-loader!./assets/rbac-setup.yaml';
+
+<details>
+  <summary>Save as `rbac-setup.yaml`</summary>
+  <CodeBlock language="yaml">{RBACSetupYAML}</CodeBlock>
+</details>
+
+import ConfigMapYAML from '!!raw-loader!./assets/configmap.yaml';
+
+<details>
+  <summary>Save as `configmap.yaml`</summary>
+  <CodeBlock language="yaml">{ConfigMapYAML}</CodeBlock>
+</details>
+
+import PrometheusDeployYAML from '!!raw-loader!./assets/prometheus.deploy.yaml';
+
+<details>
+  <summary>Save as `prometheus.deploy.yaml`</summary>
+  <CodeBlock language="yaml">{PrometheusDeployYAML}</CodeBlock>
+</details>
+
+
+import PrometheusSVCYAML from '!!raw-loader!./assets/prometheus.svc.yaml';
+
+<details>
+  <summary>Save as `prometheus.svc.yaml`</summary>
+  <CodeBlock language="yaml">{PrometheusSVCYAML}</CodeBlock>
+</details>
+
+import NodeExporterYAML from '!!raw-loader!./assets/node-exporter.yaml';
+
+<details>
+  <summary>Save as `node-exporter.yaml`</summary>
+  <CodeBlock language="yaml">{NodeExporterYAML}</CodeBlock>
+</details>
+
+```bash title="on master"
+
+kubectl create -f node-exporter.yaml
+# daemonset.apps/node-exporter created
+# service/node-exporter created
+
+kubectl create -f rbac-setup.yaml
+# clusterrolebinding.rbac.authorization.k8s.io/prometheus created
+
+kubectl create -f configmap.yaml
+# configmap/prometheus-config created
+
+kubectl create -f prometheus.deploy.yaml 
+# deployment.apps/prometheus created
+
+kubectl create -f prometheus.svc.yaml 
+# service/prometheus created
+
+kubectl get pods -n kube-system
+# NAME                                  READY   STATUS              RESTARTS   AGE
+# node-exporter-4qlmd                   1/1     Running   0          5m36s
+# node-exporter-bhfhg                   1/1     Running   0          5m35s
+# prometheus-7486bf7f4b-mdkcm           1/1     Running   0          95s
+```
+
+### Grafana
+
+import GrafanaDeployYAML from '!!raw-loader!./assets/grafana-deploy.yaml';
+
+<details>
+  <summary>Save as `grafana-deploy.yaml`</summary>
+  <CodeBlock language="yaml">{GrafanaDeployYAML}</CodeBlock>
+</details>
+
+import GrafanaSVC from '!!raw-loader!./assets/grafana-svc.yaml';
+
+<details>
+  <summary>Save as `grafana-svc.yaml`</summary>
+  <CodeBlock language="yaml">{GrafanaSVC}</CodeBlock>
+</details>
+
+import GrafanaIng from '!!raw-loader!./assets/grafana-ing.yaml';
+
+<details>
+  <summary>Save as `grafana-ing.yaml`</summary>
+  <CodeBlock language="yaml">{GrafanaIng}</CodeBlock>
+</details>
+
+```bash title="on master"
+kubectl create -f grafana-deploy.yaml
+# deployment.apps/grafana-core created
+
+kubectl create -f grafana-svc.yaml
+# service/grafana created
+
+kubectl create -f grafana-ing.yaml
+# ingress.extensions/grafana created
+
+kubectl get pods -n kube-system
+# NAME                                  READY   STATUS    RESTARTS   AGE
+# grafana-core-768b6bf79c-xdgj4         0/1     Running   0          117s
+# prometheus-7486bf7f4b-mdkcm           1/1     Running   0          9m
+```
+
+### Config Grafana
+
+#### Access Grafana Web UI
+
+```bash title="on master"
+kubectl get svc -n kube-system
+# NAME            TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                  AGE
+# grafana         NodePort    10.96.26.29      <none>        3000:30178/TCP           2m48s
+# prometheus      NodePort    10.108.160.161   <none>        9090:30003/TCP           10m
+```
+
+Therefore, access Grafana http://192.168.8.31:30178/login on your browser.
+
+Default user is `admin` and password is `admin`.
+
+#### Add data source
+
+![alt](imgs/k8s-memo/2022-06-11-06-56-25.png "title")
+
+![alt](imgs/k8s-memo/2022-06-11-06-57-01.png "title")
+
+![alt](imgs/k8s-memo/2022-06-11-06-59-03.png "title")
+
+The `Url` should be the `CLUSTER-IP` which you can get from `kubectl get svc -n kube-system`.
+
+#### Add Template 
+
+![alt](imgs/k8s-memo/2022-06-11-07-01-15.png "title")
+
+![alt](imgs/k8s-memo/2022-06-11-07-02-01.png "title")
+
+Notice that, the 315 is a template of K8S Monitoring.
+
+![alt](imgs/k8s-memo/2022-06-11-07-03-11.png "title")
+
+#### See Your Monitoring Dashboard
+
+![alt](imgs/k8s-memo/2022-06-11-07-04-39.png "title")
+
+## High Availability
+
+The current cluster architecture is dangerous if the single master node is down.
+It should be constituted as a HA cluster as follows.
+
+```mermaid
+graph LR
+  master1[Master1 192.168.8.21]
+  master2[Master2 192.168.8.22]
+  lb[Load Balancer (VIP 192.168.8.20)]
+  node1[Node1 192.168.8.31]
+  node2[Node2 192.168.8.32]
+  master1 --> lb
+  master2 --> lb
+  lb --> node1
+  lb --> node2
+```
+
+### Reset All Nodes
+
+```bash title="on master"
+kubectl delete node kube-node1
+# node "kube-node1" deleted
+kubectl delete node kube-node2
+# node "kube-node2" deleted
+```
+
+```bash title="on slave nodes"
+kubeadm reset
+```
+
+```bash title="on master"
+kubeadm reset
+```
+
+### Reconfig Master Node1 (192.168.8.21)
+
+```text title="on master, replace /etc/hosts"
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+192.168.8.20 kube-master.k8s.io kube-master
+192.168.8.21 kube-master1.k8s.io kube-master1
+192.168.8.22 kube-master2.k8s.io kube-master2
+192.168.8.31 kube-node1.k8s.io kube-node1
+192.168.8.32 kube-node2.k8s.io kube-node2
+192.168.8.33 kube-node3.k8s.io kube-node3
+```
+
+```bash title="on master1"
+hostnamectl set-hostname kube-master1
+```
+
+### Install System on Master Node2 (192.168.8.21)
+
+Do init installation on master node 2 following `Build K8S Cluster via Kubeadm` section.
+
+Notice that the `hosts` file on master node 2 should be the same as master node 1.
+
+```text title="on master2 etc/hosts"
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+192.168.8.20 kube-master.k8s.io kube-master
+192.168.8.21 kube-master1.k8s.io kube-master1
+192.168.8.22 kube-master2.k8s.io kube-master2
+192.168.8.31 kube-node1.k8s.io kube-node1
+192.168.8.32 kube-node2.k8s.io kube-node2
+192.168.8.33 kube-node3.k8s.io kube-node3
+```
+
+### Config Master Node1 + Master Node2
+
+```bash title="on master1"
+yum install -y keepalived conntrack-tools libseccomp libtool-ltd1
+```
+
+import Keepalived1 from '!!raw-loader!./assets/keepalived.conf';
+
+<details>
+  <summary>Config `/etc/keepalived/keepalived.conf` referencing follows</summary>
+  <CodeBlock language="yaml">{Keepalived1}</CodeBlock>
+</details>
+
+Notice that the `interface` and `virtual_ipaddress` should be modified according to your environment.
+
+```bash title="on master1"
+systemctl start keepalived.service
+systemctl enable keepalived.service
+systemctl status keepalived.service
+# ...
+# Jun 13 06:21:04 kube-master1 Keepalived_vrrp[31554]: VRRP_Instance(VI_1) Sending/queueing gratuitous ARPs on eth0 for 192.168.8.20
+# ...
 ```
