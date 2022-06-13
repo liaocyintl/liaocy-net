@@ -869,9 +869,9 @@ Notice that the `hosts` file on master node 2 should be the same as master node 
 192.168.8.33 kube-node3.k8s.io kube-node3
 ```
 
-### Config Master Node1 + Master Node2
+### Config Keepalived on Masters
 
-```bash title="on master1"
+```bash title="on master1 and master2"
 yum install -y keepalived conntrack-tools libseccomp libtool-ltd1
 ```
 
@@ -879,16 +879,72 @@ import Keepalived1 from '!!raw-loader!./assets/keepalived.conf';
 
 <details>
   <summary>Config `/etc/keepalived/keepalived.conf` referencing follows</summary>
-  <CodeBlock language="yaml">{Keepalived1}</CodeBlock>
+  <CodeBlock language="conf">{Keepalived1}</CodeBlock>
 </details>
 
 Notice that the `interface` and `virtual_ipaddress` should be modified according to your environment.
 
-```bash title="on master1"
+```bash title="on master1 and master2"
 systemctl start keepalived.service
 systemctl enable keepalived.service
 systemctl status keepalived.service
 # ...
 # Jun 13 06:21:04 kube-master1 Keepalived_vrrp[31554]: VRRP_Instance(VI_1) Sending/queueing gratuitous ARPs on eth0 for 192.168.8.20
 # ...
+```
+
+```bash title="on master1 and master2"
+ip a s eth0
+# 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+#     link/ether 02:11:32:2b:87:ba brd ff:ff:ff:ff:ff:ff
+#     inet 192.168.8.21/24 brd 192.168.8.255 scope global noprefixroute eth0
+#        valid_lft forever preferred_lft forever
+#     inet 192.168.8.20/32 scope global eth0
+#        valid_lft forever preferred_lft forever
+```
+
+If master 1 is down, the VIP will drift to master 2.
+
+### Config haproxy on Masters
+
+```bash title="on master1 and master2"
+yum install -y haproxy
+```
+
+import Haproxy from '!!raw-loader!./assets/haproxy.cfg';
+
+<details>
+  <summary>Config `/etc/haproxy/haproxy.cfg` referencing follows</summary>
+  <CodeBlock language="conf">{Haproxy}</CodeBlock>
+</details>
+
+```bash title="on master1 and master2"
+systemctl start haproxy.service
+systemctl enable haproxy.service
+systemctl status haproxy.service
+# ...
+# Active: active (running) since
+# ...
+
+netstat -lntup|grep haproxy
+# tcp        0      0 0.0.0.0:1080            0.0.0.0:*               LISTEN      19504/haproxy       
+# tcp        0      0 0.0.0.0:16443           0.0.0.0:*               LISTEN      19504/haproxy       
+# udp        0      0 0.0.0.0:55052           0.0.0.0:*                           19501/haproxy
+```
+
+### config kubelet on Master 1
+
+```bash title="on master1"
+mkdir /usr/local/kubernetes/manifests -p 
+```
+
+import KubeadmConfig from '!!raw-loader!./assets/kubeadm-config.yaml';
+
+<details>
+  <summary>Config `/usr/local/kubernetes/manifests/kubeadm-config.yaml` referencing follows</summary>
+  <CodeBlock language="yaml">{KubeadmConfig}</CodeBlock>
+</details>
+
+```bash title="on master1"
+kubeadm init --config /usr/local/kubernetes/manifests/kubeadm-config.yaml
 ```
