@@ -154,7 +154,7 @@ chown $(id -u):$(id -g) $HOME/.kube/config
 kubectl get nodes
 ```
 
-The token is only valid for 24-hours. You can use the following command to generate a new token.
+The token is only valid for 24-hours. You can use the following command to generate a new one.
 
 ```bash
 kubeadm token create --print-join-command
@@ -932,7 +932,12 @@ netstat -lntup|grep haproxy
 # udp        0      0 0.0.0.0:55052           0.0.0.0:*                           19501/haproxy
 ```
 
-### config kubelet on Master 1
+### Config K8S on Master 1
+
+:::warning
+The following commands must be performed on a master node that has VIP.
+Here resume the master node 1 is the VIP master.
+:::
 
 ```bash title="on master1"
 mkdir /usr/local/kubernetes/manifests -p 
@@ -947,4 +952,164 @@ import KubeadmConfig from '!!raw-loader!./assets/kubeadm-config.yaml';
 
 ```bash title="on master1"
 kubeadm init --config /usr/local/kubernetes/manifests/kubeadm-config.yaml
+# ...
+# mkdir -p $HOME/.kube
+# sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+# sudo chown $(id -u):$(id -g) $HOME/.kube/config
+# ...
+# kubeadm join kube-master1.k8s.io:16443 --token cfkgse.2yzjhgn4ykn4ny8y \
+#   --discovery-token-ca-cert-hash sha256:4a56b1dbc3456a1d11cf8ace3c22a8569702966ab035f666e2f96ba7fb5c9d39 \
+#   --control-plane
+# ...
+# kubeadm join kube-master1.k8s.io:16443 --token cfkgse.2yzjhgn4ykn4ny8y \
+#     --discovery-token-ca-cert-hash sha256:4a56b1dbc3456a1d11cf8ace3c22a8569702966ab035f666e2f96ba7fb5c9d39
+
+mkdir -p $HOME/.kube
+cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+chown $(id -u):$(id -g) $HOME/.kube/config
+kubectl get nodes
 ```
+
+```bash title="on master1"
+kubectl get cs
+# NAME                 STATUS    MESSAGE             ERROR
+# scheduler            Healthy   ok                  
+# controller-manager   Healthy   ok                  
+# etcd-0               Healthy   {"health":"true"}
+
+kubectl get pods -n kube-system
+# NAME                                   READY   STATUS    RESTARTS   AGE
+# coredns-66bff467f8-259f6               1/1     Running   0          2m2s
+# coredns-66bff467f8-pj8ct               1/1     Running   0          2m3s
+# etcd-kube-master1                      1/1     Running   0          2m47s
+# kube-apiserver-kube-master1            1/1     Running   0          2m47s
+# kube-controller-manager-kube-master1   1/1     Running   1          3m8s
+# kube-proxy-lwxkb                       1/1     Running   0          2m3s
+# kube-scheduler-kube-master1            1/1     Running   0          2m46s
+```
+
+Then you can config the flannel network referencing **Install flannel plugin** section.
+
+### Config K8S on Master 2
+
+#### Copy Certification Files from Master 1 to 2
+
+```bash title="on master1"
+ssh root@kube-master2 mkdir -p /etc/kubernetes/pki/etcd
+scp /etc/kubernetes/admin.conf root@kube-master2:/etc/kubernetes
+scp /etc/kubernetes/pki/{ca.*,sa.*,front-proxy-ca.*} root@kube-master2:/etc/kubernetes/pki
+scp /etc/kubernetes/pki/etcd/ca.* root@kube-master2:/etc/kubernetes/pki/etcd
+```
+
+#### Add Master 2 into Cluster
+
+Run the '--control-plane' one which was output by the master 1.
+
+```bash title="on master2"
+kubeadm join kube-master1.k8s.io:16443 --token cfkgse.2yzjhgn4ykn4ny8y \
+  --discovery-token-ca-cert-hash sha256:4a56b1dbc3456a1d11cf8ace3c22a8569702966ab035f666e2f96ba7fb5c9d39 \
+  --control-plane
+
+
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
+
+```bash title="on master2"
+kubectl get nodes
+# NAME           STATUS   ROLES    AGE    VERSION
+# kube-master1   Ready    master   23m    v1.18.0
+# kube-master2   Ready    master   110s   v1.18.0
+```
+
+### Config Slave Nodes
+
+```text title="on master2 etc/hosts"
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+192.168.8.20 kube-master.k8s.io kube-master
+192.168.8.21 kube-master1.k8s.io kube-master1
+192.168.8.22 kube-master2.k8s.io kube-master2
+192.168.8.31 kube-node1.k8s.io kube-node1
+192.168.8.32 kube-node2.k8s.io kube-node2
+192.168.8.33 kube-node3.k8s.io kube-node3
+```
+
+Run the command WITH OUT '--control-plane' which was output by the master 1.
+
+```bash title="on slave nodes"
+kubeadm join kube-master1.k8s.io:16443 --token cfkgse.2yzjhgn4ykn4ny8y \
+    --discovery-token-ca-cert-hash sha256:4a56b1dbc3456a1d11cf8ace3c22a8569702966ab035f666e2f96ba7fb5c9d39
+```
+
+```bash title="on master"
+kubectl get nodes
+# NAME           STATUS   ROLES    AGE   VERSION
+# kube-master1   Ready    master   62m   v1.18.0
+# kube-master2   Ready    master   41m   v1.18.0
+# kube-node1     Ready    <none>   35m   v1.18.0
+# kube-node2     Ready    <none>   39s   v1.18.0
+
+kubectl get pods -n kube-system -o wide
+# NAME                                   READY   STATUS    RESTARTS   AGE     IP             NODE           NOMINATED NODE   READINESS GATES
+# coredns-66bff467f8-259f6               1/1     Running   0          62m     10.244.0.3     kube-master1   <none>           <none>
+# coredns-66bff467f8-pj8ct               1/1     Running   0          62m     10.244.0.2     kube-master1   <none>           <none>
+# etcd-kube-master1                      1/1     Running   0          63m     192.168.8.21   kube-master1   <none>           <none>
+# etcd-kube-master2                      1/1     Running   0          42m     192.168.8.22   kube-master2   <none>           <none>
+# kube-apiserver-kube-master1            1/1     Running   0          63m     192.168.8.21   kube-master1   <none>           <none>
+# kube-apiserver-kube-master2            1/1     Running   0          42m     192.168.8.22   kube-master2   <none>           <none>
+# kube-controller-manager-kube-master1   1/1     Running   2          63m     192.168.8.21   kube-master1   <none>           <none>
+# kube-controller-manager-kube-master2   1/1     Running   1          42m     192.168.8.22   kube-master2   <none>           <none>
+# kube-flannel-ds-dp56p                  1/1     Running   0          43m     192.168.8.22   kube-master2   <none>           <none>
+# kube-flannel-ds-j2l9t                  1/1     Running   0          53m     192.168.8.21   kube-master1   <none>           <none>
+# kube-flannel-ds-k4mvt                  1/1     Running   1          37m     192.168.8.31   kube-node1     <none>           <none>
+# kube-flannel-ds-z7nz8                  1/1     Running   1          2m33s   192.168.8.32   kube-node2     <none>           <none>
+# kube-proxy-5nsfj                       1/1     Running   0          2m33s   192.168.8.32   kube-node2     <none>           <none>
+# kube-proxy-8v5wz                       1/1     Running   0          37m     192.168.8.31   kube-node1     <none>           <none>
+# kube-proxy-lwxkb                       1/1     Running   0          62m     192.168.8.21   kube-master1   <none>           <none>
+# kube-proxy-wp984                       1/1     Running   0          43m     192.168.8.22   kube-master2   <none>           <none>
+# kube-scheduler-kube-master1            1/1     Running   2          63m     192.168.8.21   kube-master1   <none>           <none>
+# kube-scheduler-kube-master2            1/1     Running   2          42m     192.168.8.22   kube-master2   <none>           <none>
+
+```
+
+The HA cluster is now ready to use.
+
+### Test the HA Cluster
+
+```bash title="on master"
+kubectl create deployment nginx --image=nginx
+# deployment.apps/nginx created
+
+kubectl expose deployment nginx --port=80 --type=NodePort
+# service/nginx exposed
+
+kubectl get pod,svc
+# NAME                        READY   STATUS    RESTARTS   AGE
+# pod/nginx-f89759699-sm8zs   1/1     Running   0          43s
+
+# NAME                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)        AGE
+# service/kubernetes   ClusterIP   10.1.0.1       <none>        443/TCP        67m
+# service/nginx        NodePort    10.1.167.111   <none>        80:30754/TCP   68s
+```
+
+Then you can access the Nginx service with VIP:  http://192.168.8.20:30754
+
+```bash title="on master1"
+shutdown -h now
+# Connection to 192.168.8.21 closed by remote host.
+# Connection to 192.168.8.21 closed.
+```
+
+```bash title="on master2"
+ip a s eth0
+# 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+#     link/ether 02:11:32:25:17:76 brd ff:ff:ff:ff:ff:ff
+#     inet 192.168.8.22/24 brd 192.168.8.255 scope global noprefixroute eth0
+#        valid_lft forever preferred_lft forever
+#     inet 192.168.8.20/32 scope global eth0
+#        valid_lft forever preferred_lft forever
+```
+
+Then you can still access the Nginx service with VIP:  http://192.168.8.20:30754
