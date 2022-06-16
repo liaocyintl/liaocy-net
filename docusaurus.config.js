@@ -26,6 +26,14 @@ const config = {
   // Even if you don't use internalization, you can use this field to set useful
   // metadata like html lang. For example, if your site is Chinese, you may want
   // to replace "en" with "zh-Hans".
+  plugins: [
+    [require.resolve("@easyops-cn/docusaurus-search-local"), //検索、https://github.com/easyops-cn/docusaurus-search-local yarn add @easyops-cn/docusaurus-search-local
+    {
+      hashed: true,
+      language: ["en"],
+    },],
+    'plugin-image-zoom',
+  ],
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
@@ -59,43 +67,15 @@ const config = {
       }),
     ],
   ],
-  // themes: ['@docusaurus/theme-search-algolia'],
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
-      algolia: {
-        // The application ID provided by Algolia
-        appId: 'LN5XFB8KWQ',
-  
-        // Public API key: it is safe to commit it
-        apiKey: '33225f44cde79ba82a28e0fbad07851c',
-  
-        indexName: 'liaocy_net',
-  
-        // Optional: see doc section below
-        contextualSearch: true,
-  
-        // Optional: Specify domains where the navigation should occur through window.location instead on history.push. Useful when our Algolia config crawls multiple documentation sites and we want to navigate with window.location.href to them.
-        externalUrlRegex: 'external\\.com|domain\\.com',
-  
-        // Optional: Algolia search parameters
-        searchParameters: {},
-  
-        // Optional: path for search page that enabled by default (`false` to disable it)
-        searchPagePath: 'search',
-  
-        //... other Algolia params
-      },
       prism: {
         theme: require('prism-react-renderer/themes/dracula'),
         additionalLanguages: ['bash', 'yaml', 'json'],
       },
       navbar: {
-        title: 'My Site',
-        logo: {
-          alt: 'My Site Logo',
-          src: 'img/logo.svg',
-        },
+        title: 'Jackie Liao',
         items: [
           {
             type: 'doc',
