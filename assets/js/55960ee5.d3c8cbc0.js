@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkliaocy_net=self.webpackChunkliaocy_net||[]).push([[121],{88070:function(e){e.exports=JSON.parse('[{"label":"Kubernetes","permalink":"/liaocy-net/docs/tags/kubernetes","count":1},{"label":"k8s","permalink":"/liaocy-net/docs/tags/k-8-s","count":1},{"label":"k8s-tutorial","permalink":"/liaocy-net/docs/tags/k-8-s-tutorial","count":1}]')}}]);
