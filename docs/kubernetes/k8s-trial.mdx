@@ -217,6 +217,13 @@ pending
 
 ## Kubectl
 
+### Get Node Info
+
+```bash title="run on master"
+kubectl get nodes
+
+```
+
 ### Delete Node
 
 ```bash title="run on master"
@@ -595,7 +602,7 @@ kubectl expose deployment nginx-dep1 --port=80 --target-port=80 --type=NodePort
   - Defind PVC
   - Defind PV
 
-### Defind PVC
+### Define PVC
 
 import PVCYAML from '!!raw-loader!./assets/pvc.yaml';
 
